@@ -2,7 +2,11 @@
 [![Website](https://img.shields.io/badge/www-Website-green)](https://sites.google.com/view/rlsbench/)
 
 
-`RLSbench` is the official implementation of [RLSbench: Domain Adaptation Under Relaxed Label Shift](https://arxiv.org/abs/2302.03020). We release datasets to get the code setup and replicate the results in the paper.
+`RLSbench` is the official implementation of [RLSbench: Domain Adaptation Under Relaxed Label Shift](https://arxiv.org/abs/2302.03020). We release the dataset setup, code and our logs/ models from our paper.
+
+### Using the Dataset in an Academic Setting
+
+To try more methods and experiments in our RLSbench setup with limited resources or for fast prototyping, we request people to read this [document](). 
 
 
 ## Paper
