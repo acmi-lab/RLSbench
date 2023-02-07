@@ -70,5 +70,5 @@ Caveat: For Test Time Adaptation (TTA) methods, we need to provide the folder wi
 The code evaluates the models trained and logs the results in the `./logs/` folder in form of a csv file. 
 
 ## License
-This repository is licensed under the terms of the [MIT License](LICENSE).
+This repository is licensed under the terms of the [Apache License](LICENSE).
 
