@@ -38,7 +38,7 @@ pip install git+https://github.com/acmi-lab/RLSbench
 ```
 
 ## Datasets 
-<img src="https://raw.githubusercontent.com/acmi-lab/RLSbench/master/images/datasets.png" height="30%">
+<img src="https://raw.githubusercontent.com/acmi-lab/RLSbench/master/images/datasets.png" height="5%">
 
 ## Dataset Setup 
 To setup different datasets, run the scrips in `dataset_scripts` folder. Except for Imagenet dataset which can be downloaded from the [official website](https://www.image-net.org/download.php), the scripts set up all the datasets (including all the source and target pairs) used in our study.
