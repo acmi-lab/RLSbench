@@ -1,0 +1,10 @@
+__pycache__
+logs
+logs*
+data
+.DS_Store
+wandb
+LSBench.egg-info
+# s3_config.sh
+ecr_read_only.csv
+label_shift_study_results
