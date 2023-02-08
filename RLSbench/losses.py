@@ -5,12 +5,12 @@ from wilds.common.metrics.loss import ElementwiseLoss
 from RLSbench.utils import cross_entropy_with_logits_loss
 
 
-def initialize_loss(loss, reduction='mean'):
-    if loss == 'cross_entropy':
+def initialize_loss(loss, reduction="mean"):
+    if loss == "cross_entropy":
         return nn.CrossEntropyLoss(reduction=reduction)
 
-    elif loss == 'cross_entropy_logits':
+    elif loss == "cross_entropy_logits":
         return ElementwiseLoss(loss_fn=cross_entropy_with_logits_loss)
 
     else:
-        raise ValueError(f'loss {loss} not recognized')
+        raise ValueError(f"loss {loss} not recognized")

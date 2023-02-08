@@ -3,15 +3,14 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from RLSbench.algorithms.single_model_algorithm import \
-    SingleModelAlgorithm
+from RLSbench.algorithms.single_model_algorithm import SingleModelAlgorithm
 from RLSbench.losses import initialize_loss
 from RLSbench.models.initializer import initialize_model
 from RLSbench.models.model_utils import linear_probe
-from RLSbench.utils import (detach_and_clone,
-                                     pseudolabel_multiclass_logits)
+from RLSbench.utils import detach_and_clone, pseudolabel_multiclass_logits
 
 logger = logging.getLogger("label_shift")
+
 
 class FixMatch(SingleModelAlgorithm):
     """
@@ -33,15 +32,15 @@ class FixMatch(SingleModelAlgorithm):
             year={2020}
             }
     """
+
     def __init__(self, config, dataloader, loss_function, n_train_steps, **kwargs):
-        
         logger.info("Intializing FixMatch algorithm model")
 
         model = initialize_model(
-            model_name = config.model, 
-            dataset_name = config.dataset,
-            num_classes = config.num_classes,
-            featurize = True, 
+            model_name=config.model,
+            dataset_name=config.dataset,
+            num_classes=config.num_classes,
+            featurize=True,
             pretrained=config.pretrained,
             pretrained_path=config.pretrained_path,
         )
@@ -57,7 +56,7 @@ class FixMatch(SingleModelAlgorithm):
         # else:
         loss = initialize_loss(loss_function)
 
-        # if config.pretrained: 
+        # if config.pretrained:
         #     model = linear_probe(model, dataloader, device= config.device, progress_bar=config.progress_bar)
 
         model = nn.Sequential(*model)
@@ -70,15 +69,22 @@ class FixMatch(SingleModelAlgorithm):
             n_train_steps=n_train_steps,
         )
         # algorithm hyperparameters
-        self.fixmatch_lambda = kwargs['self_training_lambda']
-        self.target_align = kwargs['target_align']
-        self.confidence_threshold = kwargs['self_training_threshold']
+        self.fixmatch_lambda = kwargs["self_training_lambda"]
+        self.target_align = kwargs["target_align"]
+        self.confidence_threshold = kwargs["self_training_threshold"]
         self.process_pseudolabels_function = pseudolabel_multiclass_logits
 
         self.source_balanced = config.source_balanced
         self.num_classes = config.num_classes
 
-    def process_batch(self, batch, unlabeled_batch=None, target_marginal=None, source_marginal = None, target_average=None):
+    def process_batch(
+        self,
+        batch,
+        unlabeled_batch=None,
+        target_marginal=None,
+        source_marginal=None,
+        target_average=None,
+    ):
         """
         Overrides single_model_algorithm.process_batch().
         Args:
@@ -88,8 +94,8 @@ class FixMatch(SingleModelAlgorithm):
             - results (dictionary): information about the batch
                 - y_true (Tensor): ground truth labels for batch
                 - y_pred (Tensor): model output for batch
-                - unlabeled_weak_y_pseudo (Tensor): pseudolabels on x_weak of the unlabeled batch, already thresholded 
-                - unlabeled_strong_y_pred (Tensor): model output on x_strong of the unlabeled batch, already thresholded 
+                - unlabeled_weak_y_pseudo (Tensor): pseudolabels on x_weak of the unlabeled batch, already thresholded
+                - unlabeled_strong_y_pred (Tensor): model output on x_strong of the unlabeled batch, already thresholded
         """
         # Labeled examples
         x, y_true = batch[:2]
@@ -98,9 +104,9 @@ class FixMatch(SingleModelAlgorithm):
 
         # package the results
         results = {
-            'y_true': y_true,
+            "y_true": y_true,
         }
-        
+
         # if self.source_balanced and source_marginal is not None:
         #     results['source_marginal'] = torch.tensor(source_marginal).to(self.device)
 
@@ -112,31 +118,41 @@ class FixMatch(SingleModelAlgorithm):
 
         # Unlabeled examples
         if unlabeled_batch is not None:
-            if self.target_align and target_average is not None: 
-                alignment_dist = torch.divide(torch.tensor(target_marginal).to(self.device), torch.tensor(target_average).to(self.device))
-            
+            if self.target_align and target_average is not None:
+                alignment_dist = torch.divide(
+                    torch.tensor(target_marginal).to(self.device),
+                    torch.tensor(target_average).to(self.device),
+                )
+
             (x_weak, x_strong) = unlabeled_batch[0]
             x_weak = x_weak.to(self.device)
             x_strong = x_strong.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model(x_weak)
-                
-                if self.target_align and target_average is not None: 
-                    _, pseudolabels, pseudolabels_kept_frac, mask = self.process_pseudolabels_function(
-                        outputs,
-                        self.confidence_threshold,
-                        alignment_dist
+
+                if self.target_align and target_average is not None:
+                    (
+                        _,
+                        pseudolabels,
+                        pseudolabels_kept_frac,
+                        mask,
+                    ) = self.process_pseudolabels_function(
+                        outputs, self.confidence_threshold, alignment_dist
                     )
-                else: 
-                    _, pseudolabels, pseudolabels_kept_frac, mask = self.process_pseudolabels_function(
-                        outputs,
-                        self.confidence_threshold
+                else:
+                    (
+                        _,
+                        pseudolabels,
+                        pseudolabels_kept_frac,
+                        mask,
+                    ) = self.process_pseudolabels_function(
+                        outputs, self.confidence_threshold
                     )
 
-                results['unlabeled_weak_y_pseudo'] = detach_and_clone(pseudolabels)
+                results["unlabeled_weak_y_pseudo"] = detach_and_clone(pseudolabels)
 
-        results['pseudolabels_kept_frac'] = pseudolabels_kept_frac        
+        results["pseudolabels_kept_frac"] = pseudolabels_kept_frac
 
         # Concat and call forward
         n_lab = x.shape[0]
@@ -146,29 +162,31 @@ class FixMatch(SingleModelAlgorithm):
             x_concat = x
 
         outputs = self.model(x_concat)
-        results['y_pred'] = outputs[:n_lab]
+        results["y_pred"] = outputs[:n_lab]
         if unlabeled_batch is not None:
-            results['unlabeled_strong_y_pred'] = outputs[n_lab:] if mask is None else outputs[n_lab:][mask]
-        
+            results["unlabeled_strong_y_pred"] = (
+                outputs[n_lab:] if mask is None else outputs[n_lab:][mask]
+            )
+
         return results
 
     def objective(self, results):
         # Labeled loss
-        classification_loss = self.loss(results['y_pred'], results['y_true'])
+        classification_loss = self.loss(results["y_pred"], results["y_true"])
 
-        # if self.use_target_marginal: 
+        # if self.use_target_marginal:
         #     classification_loss = torch.mean(classification_loss*results["im_weights"][results["y_true"]])
 
-        # elif self.source_balanced: 
+        # elif self.source_balanced:
         #     classification_loss = torch.mean(classification_loss/results["source_marginal"][results["y_true"]]/ self.num_classes)
 
         # Pseudolabeled loss
-        if 'unlabeled_weak_y_pseudo' in results:
+        if "unlabeled_weak_y_pseudo" in results:
             loss_output = self.loss(
-                results['unlabeled_strong_y_pred'],
-                results['unlabeled_weak_y_pseudo'],
+                results["unlabeled_strong_y_pred"],
+                results["unlabeled_weak_y_pseudo"],
             )
-            consistency_loss = loss_output * results['pseudolabels_kept_frac']
+            consistency_loss = loss_output * results["pseudolabels_kept_frac"]
         else:
             consistency_loss = 0
 

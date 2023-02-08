@@ -10,13 +10,13 @@ class SingleModelAlgorithm(Algorithm):
     """
     An abstract class for algorithm that has one underlying model.
     """
+
     def __init__(self, config, model, loss, n_train_steps):
-        
         super().__init__(config.device)
         self.loss = loss
 
         # initialize models, optimizers, and schedulers
-        if not hasattr(self, 'optimizer') or self.optimizer is None:
+        if not hasattr(self, "optimizer") or self.optimizer is None:
             self.optimizer = initialize_optimizer(config, model)
 
         self.schedulers = [initialize_scheduler(config, self.optimizer, n_train_steps)]
@@ -34,7 +34,7 @@ class SingleModelAlgorithm(Algorithm):
         outputs = self.model(x)
         return outputs
 
-    def process_batch(self, batch, unlabeled_batch = None):
+    def process_batch(self, batch, unlabeled_batch=None):
         """
         A helper function for update() and evaluate() that processes the batch
         Args:
@@ -42,7 +42,7 @@ class SingleModelAlgorithm(Algorithm):
         Output:
             - results (dictionary): information about the batch
                 - y_true (Tensor): ground truth labels for batch
-                - y_pred (Tensor): model output for batch 
+                - y_pred (Tensor): model output for batch
         """
         x, y_true = batch[:2]
         x = move_to(x, self.device)
@@ -51,8 +51,8 @@ class SingleModelAlgorithm(Algorithm):
         outputs = self.get_model_output(x)
 
         results = {
-            'y_true': y_true,
-            'y_pred': outputs,
+            "y_true": y_true,
+            "y_pred": outputs,
         }
         return results
 
@@ -74,7 +74,15 @@ class SingleModelAlgorithm(Algorithm):
         results = self.process_batch(batch)
         return results
 
-    def update(self, batch, unlabeled_batch=None, target_marginal = None, source_marginal = None, target_average = None, is_epoch_end=False):
+    def update(
+        self,
+        batch,
+        unlabeled_batch=None,
+        target_marginal=None,
+        source_marginal=None,
+        target_average=None,
+        is_epoch_end=False,
+    ):
         """
         Process the batch, update the log, and update the model
         Args:
@@ -96,7 +104,9 @@ class SingleModelAlgorithm(Algorithm):
         # self.optimizer.zero_grad()
 
         # process this batch
-        results = self.process_batch(batch, unlabeled_batch, target_marginal, source_marginal, target_average)
+        results = self.process_batch(
+            batch, unlabeled_batch, target_marginal, source_marginal, target_average
+        )
 
         # update running statistics and update model if we've reached end of effective batch
         # iterate batch index
@@ -117,22 +127,23 @@ class SingleModelAlgorithm(Algorithm):
         Should be overridden to change algorithm update beyond modifying the objective.
         """
         # compute objective
-        objective = self.objective(results) / self.gradient_accumulation_steps # normalize by gradient accumulation steps
-        results['objective'] = objective.item()
+        objective = (
+            self.objective(results) / self.gradient_accumulation_steps
+        )  # normalize by gradient accumulation steps
+        results["objective"] = objective.item()
         objective.backward()
 
         # import pdb; pdb.set_trace()
-        if (self.batch_idx) % self.gradient_accumulation_steps == 0 or self.batch_idx == 0:
-
+        if (
+            self.batch_idx
+        ) % self.gradient_accumulation_steps == 0 or self.batch_idx == 0:
             self.optimizer.step()
             self.model.zero_grad()
             # self.optimizer.step()
             self.step_schedulers(is_epoch=False)
 
-            
-        if self.batch_idx == 0: 
+        if self.batch_idx == 0:
             self.step_schedulers(is_epoch=True)
-            
 
     def step_schedulers(self, is_epoch):
         """

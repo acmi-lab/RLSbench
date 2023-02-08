@@ -3,16 +3,19 @@ from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
-from RLSbench.algorithms.single_model_algorithm import \
-    SingleModelAlgorithm
+from RLSbench.algorithms.single_model_algorithm import SingleModelAlgorithm
 from RLSbench.losses import initialize_loss
 from RLSbench.models.domain_adversarial_network import COALNetwork
 from RLSbench.models.initializer import initialize_model
 from RLSbench.models.model_utils import linear_probe
 from RLSbench.optimizer import initialize_optimizer_with_model_params
 from RLSbench.scheduler import LinearScheduleWithWarmupAndThreshold
-from RLSbench.utils import (concat_input, detach_and_clone, move_to,
-                                     pseudolabel_multiclass_logits)
+from RLSbench.utils import (
+    concat_input,
+    detach_and_clone,
+    move_to,
+    pseudolabel_multiclass_logits,
+)
 
 logger = logging.getLogger("label_shift")
 
@@ -20,6 +23,7 @@ logger = logging.getLogger("label_shift")
 def softmax_entropy(x: torch.Tensor) -> torch.Tensor:
     """Entropy of softmax distribution from logits."""
     return -(x.softmax(1) * x.log_softmax(1)).sum(1)
+
 
 class COAL(SingleModelAlgorithm):
     """
@@ -35,15 +39,15 @@ class COAL(SingleModelAlgorithm):
         organization={Springer}
         }
     """
-    def __init__(self, config, dataloader, loss_function, n_train_steps, **kwargs):
 
+    def __init__(self, config, dataloader, loss_function, n_train_steps, **kwargs):
         logger.info("Initializing PseudoLabel models")
 
         model = initialize_model(
-            model_name = config.model, 
-            dataset_name = config.dataset,
-            num_classes = config.num_classes,
-            featurize = True, 
+            model_name=config.model,
+            dataset_name=config.dataset,
+            num_classes=config.num_classes,
+            featurize=True,
             pretrained=config.pretrained,
             pretrained_path=config.pretrained_path,
         )
@@ -54,28 +58,35 @@ class COAL(SingleModelAlgorithm):
             self.use_target_marginal = False
 
         if config.source_balanced or self.use_target_marginal:
-            loss = initialize_loss(loss_function, reduction='none')
+            loss = initialize_loss(loss_function, reduction="none")
         else:
             loss = initialize_loss(loss_function)
 
-        # if config.pretrained: 
+        # if config.pretrained:
         #     featurizer, classifier = linear_probe(model, dataloader, device= config.device, progress_bar=config.progress_bar)
 
-        model = COALNetwork(model[0], num_classes = config.num_classes)
+        model = COALNetwork(model[0], num_classes=config.num_classes)
 
         featurizer = model.featurizer
         classifier = model.classifier
 
-        if config.pretrained : 
-            linear_probe( (featurizer, classifier), dataloader, device= config.device, progress_bar=config.progress_bar)
+        if config.pretrained:
+            linear_probe(
+                (featurizer, classifier),
+                dataloader,
+                device=config.device,
+                progress_bar=config.progress_bar,
+            )
 
         parameters_to_optimize: List[Dict] = model.get_parameters_with_lr(
             featurizer_lr=kwargs["featurizer_lr"],
             classifier_lr=kwargs["classifier_lr"],
             # discriminator_lr=kwargs["discriminator_lr"],
         )
-        
-        self.optimizer = initialize_optimizer_with_model_params(config, parameters_to_optimize)
+
+        self.optimizer = initialize_optimizer_with_model_params(
+            config, parameters_to_optimize
+        )
 
         # initialize module
         super().__init__(
@@ -86,8 +97,8 @@ class COAL(SingleModelAlgorithm):
         )
 
         # algorithm hyperparameters
-        self.confidence_threshold = kwargs['self_training_threshold']
-        self.alpha = kwargs['alpha']
+        self.confidence_threshold = kwargs["self_training_threshold"]
+        self.alpha = kwargs["alpha"]
         self.process_pseudolabels_function = pseudolabel_multiclass_logits
 
         self.target_align = False
@@ -95,7 +106,14 @@ class COAL(SingleModelAlgorithm):
         self.source_balanced = config.source_balanced
         self.num_classes = config.num_classes
 
-    def process_batch(self, batch, unlabeled_batch=None, target_marginal=None, source_marginal = None, target_average=None):
+    def process_batch(
+        self,
+        batch,
+        unlabeled_batch=None,
+        target_marginal=None,
+        source_marginal=None,
+        target_average=None,
+    ):
         """
         Overrides single_model_algorithm.process_batch().
         Args:
@@ -105,8 +123,8 @@ class COAL(SingleModelAlgorithm):
             - results (dictionary): information about the batch
                 - y_true (Tensor): ground truth labels for batch
                 - y_pred (Tensor): model output for batch
-                - unlabeled_y_pseudo (Tensor): pseudolabels on the unlabeled batch, already thresholded 
-                - unlabeled_y_pred (Tensor): model output on the unlabeled batch, already thresholded 
+                - unlabeled_y_pseudo (Tensor): pseudolabels on the unlabeled batch, already thresholded
+                - unlabeled_y_pred (Tensor): model output on the unlabeled batch, already thresholded
         """
         # Labeled examples
         x, y_true = batch[:2]
@@ -117,10 +135,10 @@ class COAL(SingleModelAlgorithm):
 
         # package the results
         results = {
-            'y_true': y_true,
+            "y_true": y_true,
         }
 
-        # TODO: Add target alignment if it is useful 
+        # TODO: Add target alignment if it is useful
         # alignment_dist = torch.divide(torch.tensor(target_marginal).to(self.device), torch.tensor(target_average).to(self.device))
 
         if unlabeled_batch is not None:
@@ -132,32 +150,45 @@ class COAL(SingleModelAlgorithm):
             unlabeled_output = outputs[n_lab:]
 
             if self.target_align:
-                unlabeled_y_pred, unlabeled_y_pseudo, pseudolabels_kept_frac, _ = self.process_pseudolabels_function(
-                    unlabeled_output,
-                    self.confidence_threshold, 
-                    alignment_dist
+                (
+                    unlabeled_y_pred,
+                    unlabeled_y_pseudo,
+                    pseudolabels_kept_frac,
+                    _,
+                ) = self.process_pseudolabels_function(
+                    unlabeled_output, self.confidence_threshold, alignment_dist
                 )
             else:
-                unlabeled_y_pred, unlabeled_y_pseudo, pseudolabels_kept_frac, _ = self.process_pseudolabels_function(
-                    unlabeled_output,
-                    self.confidence_threshold
+                (
+                    unlabeled_y_pred,
+                    unlabeled_y_pseudo,
+                    pseudolabels_kept_frac,
+                    _,
+                ) = self.process_pseudolabels_function(
+                    unlabeled_output, self.confidence_threshold
                 )
 
-            results['y_pred'] = outputs[:n_lab]
-            results['unlabeled_y_pred'] = unlabeled_y_pred
-            results['unlabeled_y_pseudo'] = detach_and_clone(unlabeled_y_pseudo)
+            results["y_pred"] = outputs[:n_lab]
+            results["unlabeled_y_pred"] = unlabeled_y_pred
+            results["unlabeled_y_pseudo"] = detach_and_clone(unlabeled_y_pseudo)
 
             if self.source_balanced and source_marginal is not None:
-                results['source_marginal'] = torch.tensor(source_marginal).to(self.device)
+                results["source_marginal"] = torch.tensor(source_marginal).to(
+                    self.device
+                )
 
             if self.use_target_marginal and target_marginal is not None:
-                results['im_weights'] = torch.divide(torch.tensor(target_marginal).to(self.device),\
-                    torch.tensor(source_marginal).to(self.device))
-                results['target_marginal'] = torch.tensor(target_marginal).to(self.device)
+                results["im_weights"] = torch.divide(
+                    torch.tensor(target_marginal).to(self.device),
+                    torch.tensor(source_marginal).to(self.device),
+                )
+                results["target_marginal"] = torch.tensor(target_marginal).to(
+                    self.device
+                )
 
             x_unlab_copy = torch.clone(x_unlab)
             unlabeled_output_ent = self.model(x_unlab_copy, reverse=True)
-            results['unlabeled_y_pred_ent'] = unlabeled_output_ent
+            results["unlabeled_y_pred_ent"] = unlabeled_output_ent
 
             ## New edits below
 
@@ -167,51 +198,55 @@ class COAL(SingleModelAlgorithm):
             # outputs_unlab = self.model(x_unlab, reverse=True)
             # results['unlabeled_y_pred'] = outputs_unlab
 
-
         else:
-            results['y_pred'] = self.get_model_output(x)
+            results["y_pred"] = self.get_model_output(x)
             pseudolabels_kept_frac = 0
 
-        results['pseudolabels_kept_frac'] = pseudolabels_kept_frac        
+        results["pseudolabels_kept_frac"] = pseudolabels_kept_frac
 
         return results
 
     def objective(self, results):
-
         # Labeled loss
-        classification_loss = self.loss(
-            results['y_pred'], results['y_true']
-        )
+        classification_loss = self.loss(results["y_pred"], results["y_true"])
 
-        if self.use_target_marginal: 
-            classification_loss = torch.mean(classification_loss*results["im_weights"][results["y_true"]])
-
-        elif self.source_balanced: 
-            classification_loss = torch.mean(classification_loss/results["source_marginal"][results["y_true"]]/ self.num_classes)
-
-
-        # Pseudolabeled loss
-        if 'unlabeled_y_pred' in results:
-            loss_output = self.loss(
-                results['unlabeled_y_pred'],
-                results['unlabeled_y_pseudo'],
+        if self.use_target_marginal:
+            classification_loss = torch.mean(
+                classification_loss * results["im_weights"][results["y_true"]]
             )
 
-            if self.source_balanced: 
+        elif self.source_balanced:
+            classification_loss = torch.mean(
+                classification_loss
+                / results["source_marginal"][results["y_true"]]
+                / self.num_classes
+            )
+
+        # Pseudolabeled loss
+        if "unlabeled_y_pred" in results:
+            loss_output = self.loss(
+                results["unlabeled_y_pred"],
+                results["unlabeled_y_pseudo"],
+            )
+
+            if self.source_balanced:
                 target_marginal = results["target_marginal"]
                 target_marginal[target_marginal == 0] = 1.0
 
-                loss_output = torch.mean(loss_output / target_marginal[results["unlabeled_y_pseudo"]]/ self.num_classes)
+                loss_output = torch.mean(
+                    loss_output
+                    / target_marginal[results["unlabeled_y_pseudo"]]
+                    / self.num_classes
+                )
 
+            elif self.use_target_marginal:
+                loss_output = torch.mean(loss_output)
 
-            elif self.use_target_marginal: 
-                loss_output = torch.mean(loss_output) 
+            consistency_loss = loss_output * results["pseudolabels_kept_frac"]
 
-            consistency_loss = loss_output * results['pseudolabels_kept_frac']
+            y_pred_ent = results["unlabeled_y_pred_ent"]
+            ent_loss = -self.alpha * torch.mean(softmax_entropy(y_pred_ent), dim=0)
 
-            y_pred_ent= results['unlabeled_y_pred_ent']
-            ent_loss =  - self.alpha* torch.mean(softmax_entropy(y_pred_ent), dim=0)
-        
             # import pdb; pdb.set_trace()
         else:
             consistency_loss = 0

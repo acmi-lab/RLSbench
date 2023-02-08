@@ -13,8 +13,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 
-sys.path.insert(1, os.path.join(sys.path[0], '../../..'))
+sys.path.insert(1, os.path.join(sys.path[0], "../../.."))
 import examples.models.resnet_multispectral as resnet_ms
+
 
 class SwAVModel(nn.Module):
     def __init__(
@@ -27,11 +28,11 @@ class SwAVModel(nn.Module):
     ):
         super(SwAVModel, self).__init__()
 
-        self.base_model = base_model # base CNN architecture
-        self.l2norm = normalize # whether to normalize output features
+        self.base_model = base_model  # base CNN architecture
+        self.l2norm = normalize  # whether to normalize output features
 
         # projection head
-        last_dim = base_model.d_out # output dimensionality of final featurizer layer
+        last_dim = base_model.d_out  # output dimensionality of final featurizer layer
         if output_dim == 0:
             self.projection_head = None
         elif hidden_mlp == 0:
@@ -65,20 +66,25 @@ class SwAVModel(nn.Module):
     def forward(self, inputs):
         if not isinstance(inputs, list):
             inputs = [inputs]
-        idx_crops = torch.cumsum(torch.unique_consecutive(
-            torch.tensor([inp.shape[-1] for inp in inputs]),
-            return_counts=True,
-        )[1], 0)
+        idx_crops = torch.cumsum(
+            torch.unique_consecutive(
+                torch.tensor([inp.shape[-1] for inp in inputs]),
+                return_counts=True,
+            )[1],
+            0,
+        )
         start_idx = 0
         for end_idx in idx_crops:
             _out = self.base_model(
-                torch.cat(inputs[start_idx: end_idx]).cuda(non_blocking=True))
+                torch.cat(inputs[start_idx:end_idx]).cuda(non_blocking=True)
+            )
             if start_idx == 0:
                 output = _out
             else:
                 output = torch.cat((output, _out))
             start_idx = end_idx
         return self.forward_head(output)
+
 
 class MultiPrototypes(nn.Module):
     def __init__(self, output_dim, nmb_prototypes):

@@ -27,6 +27,7 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 import torch.optim
+
 try:
     import apex
     from apex.parallel.LARC import LARC
@@ -47,7 +48,7 @@ from src.utils import (
     init_distributed_mode,
     ParseKwargs,
     plot_experiment,
-    populate_defaults_for_swav
+    populate_defaults_for_swav,
 )
 from src.multicropdataset import CustomSplitMultiCropDataset
 from src.model import SwAVModel
@@ -55,9 +56,11 @@ from src.model import SwAVModel
 from models.initializer import initialize_model
 from utils import initialize_wandb
 
-import logging 
+import logging
 
-logFormatter = logging.Formatter('%(asctime)s, [%(levelname)s, %(filename)s:%(lineno)d] %(message)s')
+logFormatter = logging.Formatter(
+    "%(asctime)s, [%(levelname)s, %(filename)s:%(lineno)d] %(message)s"
+)
 
 logger = logging.getLogger("label_shift")
 logger.setLevel(logging.DEBUG)
@@ -72,101 +75,209 @@ parser = argparse.ArgumentParser(description="Implementation of SwAV")
 #########################
 ##### dataset params ####
 #########################
-parser.add_argument('-d', '--dataset', required=True)
-parser.add_argument('--root_dir', required=True,
-                    help='The directory where [dataset]/data can be found (or should be downloaded to, if it does not exist).')
-parser.add_argument('--dataset_kwargs', nargs='*', action=ParseKwargs, default={})
-parser.add_argument('--loader_kwargs', nargs='*', action=ParseKwargs, default={})
-parser.add_argument('--splits', nargs='+')
-parser.add_argument('--num_classes', type=int, default=10)
+parser.add_argument("-d", "--dataset", required=True)
+parser.add_argument(
+    "--root_dir",
+    required=True,
+    help="The directory where [dataset]/data can be found (or should be downloaded to, if it does not exist).",
+)
+parser.add_argument("--dataset_kwargs", nargs="*", action=ParseKwargs, default={})
+parser.add_argument("--loader_kwargs", nargs="*", action=ParseKwargs, default={})
+parser.add_argument("--splits", nargs="+")
+parser.add_argument("--num_classes", type=int, default=10)
 
 #########################
 #### data aug params ####
 #########################
 parser.add_argument("--nmb_crops", type=int, nargs="+", help="list of number of crops")
 parser.add_argument("--size_crops", type=int, nargs="+", help="crops resolutions")
-parser.add_argument("--min_scale_crops", type=float, nargs="+", help="argument in RandomResizedCrop")
-parser.add_argument("--max_scale_crops", type=float, nargs="+", help="argument in RandomResizedCrop")
+parser.add_argument(
+    "--min_scale_crops", type=float, nargs="+", help="argument in RandomResizedCrop"
+)
+parser.add_argument(
+    "--max_scale_crops", type=float, nargs="+", help="argument in RandomResizedCrop"
+)
 
 #########################
 ## swav specific params #
 #########################
-parser.add_argument("--crops_for_assign", type=int, nargs="+", default=[0, 1],
-                    help="list of crops id used for computing assignments (default: [0, 1])")
-parser.add_argument("--temperature", default=0.1, type=float,
-                    help="temperature parameter in training loss (default: 0.1)")
-parser.add_argument("--epsilon", default=0.03, type=float,
-                    help="regularization parameter for Sinkhorn-Knopp algorithm (default: 0.03)")
-parser.add_argument("--sinkhorn_iterations", default=3, type=int,
-                    help="number of iterations in Sinkhorn-Knopp algorithm")
-parser.add_argument("--feat_dim", default=128, type=int,
-                    help="feature dimension")
+parser.add_argument(
+    "--crops_for_assign",
+    type=int,
+    nargs="+",
+    default=[0, 1],
+    help="list of crops id used for computing assignments (default: [0, 1])",
+)
+parser.add_argument(
+    "--temperature",
+    default=0.1,
+    type=float,
+    help="temperature parameter in training loss (default: 0.1)",
+)
+parser.add_argument(
+    "--epsilon",
+    default=0.03,
+    type=float,
+    help="regularization parameter for Sinkhorn-Knopp algorithm (default: 0.03)",
+)
+parser.add_argument(
+    "--sinkhorn_iterations",
+    default=3,
+    type=int,
+    help="number of iterations in Sinkhorn-Knopp algorithm",
+)
+parser.add_argument("--feat_dim", default=128, type=int, help="feature dimension")
 parser.add_argument("--nmb_prototypes", type=int, help="number of prototypes")
-parser.add_argument("--queue_length", type=int, default=0,
-                    help="length of the queue (0 for no queue)")
-parser.add_argument("--epoch_queue_starts", type=int, default=500,
-                    help="from this epoch, we start using a queue")
+parser.add_argument(
+    "--queue_length", type=int, default=0, help="length of the queue (0 for no queue)"
+)
+parser.add_argument(
+    "--epoch_queue_starts",
+    type=int,
+    default=500,
+    help="from this epoch, we start using a queue",
+)
 
 #########################
 #### optim parameters ###
 #########################
-parser.add_argument('--optimizer_kwargs', nargs='*', action=ParseKwargs, default={})
-parser.add_argument("--n_epochs", default=400, type=int,
-                    help="number of total epochs to run")
-parser.add_argument("--warmup_epochs", default=0, type=int, help="number of warmup epochs (default: 0)")
-parser.add_argument("--batch_size", type=int,
-                    help="batch size per gpu, i.e. how many unique instances per gpu")
+parser.add_argument("--optimizer_kwargs", nargs="*", action=ParseKwargs, default={})
+parser.add_argument(
+    "--n_epochs", default=400, type=int, help="number of total epochs to run"
+)
+parser.add_argument(
+    "--warmup_epochs", default=0, type=int, help="number of warmup epochs (default: 0)"
+)
+parser.add_argument(
+    "--batch_size",
+    type=int,
+    help="batch size per gpu, i.e. how many unique instances per gpu",
+)
 parser.add_argument("--lr", type=float, help="base learning rate")
 parser.add_argument("--final_lr", type=float, help="final learning rate")
-parser.add_argument("--freeze_prototypes_niters", default=5005, type=int,
-                    help="freeze the prototypes during this many iterations from the start (default: 5005).")
+parser.add_argument(
+    "--freeze_prototypes_niters",
+    default=5005,
+    type=int,
+    help="freeze the prototypes during this many iterations from the start (default: 5005).",
+)
 parser.add_argument("--weight_decay", default=1e-6, type=float, help="weight decay")
-parser.add_argument("--start_warmup", default=0, type=float,
-                    help="initial warmup learning rate")
+parser.add_argument(
+    "--start_warmup", default=0, type=float, help="initial warmup learning rate"
+)
 
 #########################
 #### dist parameters ###
 #########################
-parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up distributed
-                    training; see https://pytorch.org/docs/stable/distributed.html""")
-parser.add_argument("--world_size", default=-1, type=int, help="""
+parser.add_argument(
+    "--dist_url",
+    default="env://",
+    type=str,
+    help="""url used to set up distributed
+                    training; see https://pytorch.org/docs/stable/distributed.html""",
+)
+parser.add_argument(
+    "--world_size",
+    default=-1,
+    type=int,
+    help="""
                     number of processes: it is set automatically and
-                    should not be passed as argument""")
-parser.add_argument("--rank", default=0, type=int, help="""rank of this process:
-                    it is set automatically and should not be passed as argument""")
-parser.add_argument("--local_rank", default=0, type=int,
-                    help="this argument is not used and should be ignored")
+                    should not be passed as argument""",
+)
+parser.add_argument(
+    "--rank",
+    default=0,
+    type=int,
+    help="""rank of this process:
+                    it is set automatically and should not be passed as argument""",
+)
+parser.add_argument(
+    "--local_rank",
+    default=0,
+    type=int,
+    help="this argument is not used and should be ignored",
+)
 
 #########################
 #### other parameters ###
 #########################
-parser.add_argument("--model", type=str, help="convnet architecture. If not set, uses default model specified in WILDS.")
-parser.add_argument('--model_kwargs', nargs='*', action=ParseKwargs, default={},
-                    help='keyword arguments for model initialization passed as key1=value1 key2=value2')
-parser.add_argument("--hidden_mlp", default=2048, type=int,
-                    help="hidden layer dimension in projection head")
-parser.add_argument("--checkpoint_freq", type=int, default=50,
-                    help="Save the model periodically")
-parser.add_argument("--use_fp16", type=bool_flag, default=True,
-                    help="whether to train with mixed precision or not")
+parser.add_argument(
+    "--model",
+    type=str,
+    help="convnet architecture. If not set, uses default model specified in WILDS.",
+)
+parser.add_argument(
+    "--model_kwargs",
+    nargs="*",
+    action=ParseKwargs,
+    default={},
+    help="keyword arguments for model initialization passed as key1=value1 key2=value2",
+)
+parser.add_argument(
+    "--hidden_mlp",
+    default=2048,
+    type=int,
+    help="hidden layer dimension in projection head",
+)
+parser.add_argument(
+    "--checkpoint_freq", type=int, default=50, help="Save the model periodically"
+)
+parser.add_argument(
+    "--use_fp16",
+    type=bool_flag,
+    default=True,
+    help="whether to train with mixed precision or not",
+)
 parser.add_argument("--sync_bn", type=str, default="pytorch", help="synchronize bn")
-parser.add_argument("--syncbn_process_group_size", type=int, default=8, help=""" see
-                    https://github.com/NVIDIA/apex/blob/master/apex/parallel/__init__.py#L58-L67""")
-parser.add_argument("--log_dir", type=str, default=".",
-                    help="experiment dump path for checkpoints and log")
+parser.add_argument(
+    "--syncbn_process_group_size",
+    type=int,
+    default=8,
+    help=""" see
+                    https://github.com/NVIDIA/apex/blob/master/apex/parallel/__init__.py#L58-L67""",
+)
+parser.add_argument(
+    "--log_dir",
+    type=str,
+    default=".",
+    help="experiment dump path for checkpoints and log",
+)
 parser.add_argument("--seed", type=int, default=0, help="seed")
-parser.add_argument("--is_not_slurm_job", type=bool_flag, default=True, help="Set to true if not running in Slurm.")
-parser.add_argument("--cpu_only", type=bool_flag, default=False,
-                    help="Set to true to run experiment on CPUs instead of GPUs (for debugging).")
-parser.add_argument("--pretrained", type=bool_flag, default=True, help="Set to true to use pretrained model.")
-parser.add_argument('--pretrained_model_path', default=None, type=str)
+parser.add_argument(
+    "--is_not_slurm_job",
+    type=bool_flag,
+    default=True,
+    help="Set to true if not running in Slurm.",
+)
+parser.add_argument(
+    "--cpu_only",
+    type=bool_flag,
+    default=False,
+    help="Set to true to run experiment on CPUs instead of GPUs (for debugging).",
+)
+parser.add_argument(
+    "--pretrained",
+    type=bool_flag,
+    default=True,
+    help="Set to true to use pretrained model.",
+)
+parser.add_argument("--pretrained_model_path", default=None, type=str)
 
 # Weights & Biases
-parser.add_argument('--use_wandb', type=bool_flag, nargs='?', default=False)
-parser.add_argument('--wandb_api_key_path', type=str,
-                    help="Path to Weights & Biases API Key. If use_wandb is set to True and this argument is not specified, user will be prompted to authenticate.")
-parser.add_argument('--wandb_kwargs', nargs='*', action=ParseKwargs, default={},
-                    help="Will be passed directly into wandb.init().")
+parser.add_argument("--use_wandb", type=bool_flag, nargs="?", default=False)
+parser.add_argument(
+    "--wandb_api_key_path",
+    type=str,
+    help="Path to Weights & Biases API Key. If use_wandb is set to True and this argument is not specified, user will be prompted to authenticate.",
+)
+parser.add_argument(
+    "--wandb_kwargs",
+    nargs="*",
+    action=ParseKwargs,
+    default={},
+    help="Will be passed directly into wandb.init().",
+)
+
 
 def main():
     global args
@@ -175,11 +286,13 @@ def main():
     init_distributed_mode(args)
     fix_random_seeds(args.seed)
 
-    args.log_dir = f"{args.log_dir}/{args.dataset}_{args.target_split}/{args.algorithm}/"
+    args.log_dir = (
+        f"{args.log_dir}/{args.dataset}_{args.target_split}/{args.algorithm}/"
+    )
 
     if not os.path.exists(args.log_dir):
         os.makedirs(args.log_dir)
-        
+
     logger, training_stats = initialize_exp(args, "epoch", "loss")
     logger.info(f"Initialized distributed mode...\n{args}")
 
@@ -205,20 +318,22 @@ def main():
     )
     logger.info("Building data done with {} images loaded.".format(len(train_dataset)))
 
-    d_out = 1 # this can be arbitrary; final layer is discarded for SwAVModel
+    d_out = 1  # this can be arbitrary; final layer is discarded for SwAVModel
     base_model, _ = initialize_model(
-                model_name=args.model, 
-                dataset_name=args.dataset, 
-                num_classes=1, 
-                featurize=True, 
-                pretrained=True, 
-                pretrained_path=args.pretrained_model_path,
-                )
+        model_name=args.model,
+        dataset_name=args.dataset,
+        num_classes=1,
+        featurize=True,
+        pretrained=True,
+        pretrained_path=args.pretrained_model_path,
+    )
 
-    
     model = SwAVModel(
-        base_model, normalize=True, output_dim=args.feat_dim,
-        hidden_mlp=args.hidden_mlp, nmb_prototypes=args.nmb_prototypes
+        base_model,
+        normalize=True,
+        output_dim=args.feat_dim,
+        hidden_mlp=args.hidden_mlp,
+        nmb_prototypes=args.nmb_prototypes,
     )
 
     # synchronize batch norm layers
@@ -227,7 +342,9 @@ def main():
     elif args.sync_bn == "apex":
         # with apex syncbn we sync bn per group because it speeds up computation
         # compared to global syncbn
-        process_group = apex.parallel.create_syncbn_process_group(args.syncbn_process_group_size)
+        process_group = apex.parallel.create_syncbn_process_group(
+            args.syncbn_process_group_size
+        )
         model = apex.parallel.convert_syncbn_model(model, process_group=process_group)
     # copy model to GPU
     model = model.cuda()
@@ -243,10 +360,26 @@ def main():
         weight_decay=args.weight_decay,
     )
     optimizer = LARC(optimizer=optimizer, trust_coefficient=0.001, clip=False)
-    warmup_lr_schedule = np.linspace(args.start_warmup, args.lr, len(train_loader) * args.warmup_epochs)
+    warmup_lr_schedule = np.linspace(
+        args.start_warmup, args.lr, len(train_loader) * args.warmup_epochs
+    )
     iters = np.arange(len(train_loader) * (args.n_epochs - args.warmup_epochs))
-    cosine_lr_schedule = np.array([args.final_lr + 0.5 * (args.lr - args.final_lr) * (1 + \
-                         math.cos(math.pi * t / (len(train_loader) * (args.n_epochs - args.warmup_epochs)))) for t in iters])
+    cosine_lr_schedule = np.array(
+        [
+            args.final_lr
+            + 0.5
+            * (args.lr - args.final_lr)
+            * (
+                1
+                + math.cos(
+                    math.pi
+                    * t
+                    / (len(train_loader) * (args.n_epochs - args.warmup_epochs))
+                )
+            )
+            for t in iters
+        ]
+    )
     lr_schedule = np.concatenate((warmup_lr_schedule, cosine_lr_schedule))
     logger.info("Building optimizer done.")
 
@@ -256,10 +389,7 @@ def main():
         logger.info("Initializing mixed precision done.")
 
     # wrap model
-    model = nn.parallel.DistributedDataParallel(
-        model,
-        device_ids=[args.gpu_to_work_on]
-    )
+    model = nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu_to_work_on])
 
     # optionally resume from a checkpoint
     to_restore = {"epoch": 0}
@@ -359,19 +489,21 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue):
         loss = 0
         for i, crop_id in enumerate(args.crops_for_assign):
             with torch.no_grad():
-                out = output[bs * crop_id: bs * (crop_id + 1)].detach()
+                out = output[bs * crop_id : bs * (crop_id + 1)].detach()
 
                 # time to use the queue
                 if queue is not None:
                     if use_the_queue or not torch.all(queue[i, -1, :] == 0):
                         use_the_queue = True
-                        out = torch.cat((torch.mm(
-                            queue[i],
-                            model.module.prototypes.weight.t()
-                        ), out))
+                        out = torch.cat(
+                            (
+                                torch.mm(queue[i], model.module.prototypes.weight.t()),
+                                out,
+                            )
+                        )
                     # fill the queue
                     queue[i, bs:] = queue[i, :-bs].clone()
-                    queue[i, :bs] = embedding[crop_id * bs: (crop_id + 1) * bs]
+                    queue[i, :bs] = embedding[crop_id * bs : (crop_id + 1) * bs]
 
                 # get assignments
                 q = distributed_sinkhorn(out)[-bs:]
@@ -379,7 +511,7 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue):
             # cluster assignment prediction
             subloss = 0
             for v in np.delete(np.arange(np.sum(args.nmb_crops)), crop_id):
-                x = output[bs * v: bs * (v + 1)] / args.temperature
+                x = output[bs * v : bs * (v + 1)] / args.temperature
                 subloss -= torch.mean(torch.sum(q * F.log_softmax(x, dim=1), dim=1))
             loss += subloss / (np.sum(args.nmb_crops) - 1)
         loss /= len(args.crops_for_assign)
@@ -402,7 +534,7 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue):
         losses.update(loss.item(), inputs[0].size(0))
         batch_time.update(time.time() - end)
         end = time.time()
-        if args.rank ==0 and it % 50 == 0:
+        if args.rank == 0 and it % 50 == 0:
             logger.info(
                 "Epoch: [{0}][{1}]\t"
                 "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
@@ -430,9 +562,11 @@ def train(train_loader, model, optimizer, epoch, lr_schedule, queue):
 
 @torch.no_grad()
 def distributed_sinkhorn(out):
-    Q = torch.exp(out / args.epsilon).t() # Q is K-by-B for consistency with notations from our paper
-    B = Q.shape[1] * args.world_size # number of samples to assign
-    K = Q.shape[0] # how many prototypes
+    Q = torch.exp(
+        out / args.epsilon
+    ).t()  # Q is K-by-B for consistency with notations from our paper
+    B = Q.shape[1] * args.world_size  # number of samples to assign
+    K = Q.shape[0]  # how many prototypes
 
     # make the matrix sums to 1
     sum_Q = torch.sum(Q)
@@ -450,7 +584,7 @@ def distributed_sinkhorn(out):
         Q /= torch.sum(Q, dim=0, keepdim=True)
         Q /= B
 
-    Q *= B # the colomns must sum to 1 so that Q is an assignment
+    Q *= B  # the colomns must sum to 1 so that Q is an assignment
     return Q.t()
 
 

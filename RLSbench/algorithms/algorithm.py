@@ -3,10 +3,13 @@ from RLSbench.utils import detach_and_clone, move_to
 
 
 class Algorithm(nn.Module):
-    def __init__(self, device, ):
+    def __init__(
+        self,
+        device,
+    ):
         super().__init__()
         self.device = device
-        self.out_device = 'cpu'
+        self.out_device = "cpu"
 
     def update(self, batch):
         """

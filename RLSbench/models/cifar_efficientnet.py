@@ -1,13 +1,13 @@
-'''EfficientNet in PyTorch.
+"""EfficientNet in PyTorch.
 Paper: "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks".
-'''
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class Block(nn.Module):
-    '''expand + depthwise + pointwise + squeeze-excitation'''
+    """expand + depthwise + pointwise + squeeze-excitation"""
 
     def __init__(self, in_planes, out_planes, expansion, stride):
         super(Block, self).__init__()
@@ -15,26 +15,41 @@ class Block(nn.Module):
 
         planes = expansion * in_planes
         self.conv1 = nn.Conv2d(
-            in_planes, planes, kernel_size=1, stride=1, padding=0, bias=False)
+            in_planes, planes, kernel_size=1, stride=1, padding=0, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3,
-                               stride=stride, padding=1, groups=planes, bias=False)
+        self.conv2 = nn.Conv2d(
+            planes,
+            planes,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
+            groups=planes,
+            bias=False,
+        )
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(
-            planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False)
+            planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False
+        )
         self.bn3 = nn.BatchNorm2d(out_planes)
 
         self.shortcut = nn.Sequential()
         if stride == 1 and in_planes != out_planes:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, out_planes, kernel_size=1,
-                          stride=1, padding=0, bias=False),
+                nn.Conv2d(
+                    in_planes,
+                    out_planes,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(out_planes),
             )
 
         # SE layers
-        self.fc1 = nn.Conv2d(out_planes, out_planes//16, kernel_size=1)
-        self.fc2 = nn.Conv2d(out_planes//16, out_planes, kernel_size=1)
+        self.fc1 = nn.Conv2d(out_planes, out_planes // 16, kernel_size=1)
+        self.fc2 = nn.Conv2d(out_planes // 16, out_planes, kernel_size=1)
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
@@ -53,8 +68,7 @@ class EfficientNet(nn.Module):
     def __init__(self, cfg, num_classes=10, features=False):
         super(EfficientNet, self).__init__()
         self.cfg = cfg
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=3,
-                               stride=1, padding=1, bias=False)
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(32)
         self.layers = self._make_layers(in_planes=32)
         self.linear = nn.Linear(cfg[-1][1], num_classes)
@@ -63,7 +77,7 @@ class EfficientNet(nn.Module):
     def _make_layers(self, in_planes):
         layers = []
         for expansion, out_planes, num_blocks, stride in self.cfg:
-            strides = [stride] + [1]*(num_blocks-1)
+            strides = [stride] + [1] * (num_blocks - 1)
             for stride in strides:
                 layers.append(Block(in_planes, out_planes, expansion, stride))
                 in_planes = out_planes
@@ -76,7 +90,7 @@ class EfficientNet(nn.Module):
 
         if self.features:
             return out
-        
+
         else:
             out = self.linear(out)
             return out
@@ -84,11 +98,13 @@ class EfficientNet(nn.Module):
 
 def EfficientNetB0(num_classes=10, features=False):
     # (expansion, out_planes, num_blocks, stride)
-    cfg = [(1,  16, 1, 2),
-           (6,  24, 2, 1),
-           (6,  40, 2, 2),
-           (6,  80, 3, 2),
-           (6, 112, 3, 1),
-           (6, 192, 4, 2),
-           (6, 320, 1, 2)]
+    cfg = [
+        (1, 16, 1, 2),
+        (6, 24, 2, 1),
+        (6, 40, 2, 2),
+        (6, 80, 3, 2),
+        (6, 112, 3, 1),
+        (6, 192, 4, 2),
+        (6, 320, 1, 2),
+    ]
     return EfficientNet(cfg, num_classes, features)

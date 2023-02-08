@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -116,11 +117,11 @@ class ResNet(nn.Module):
         out = self.layer4(out)
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
-        if self.features: 
+        if self.features:
             return out
 
         else:
-            final_out = self.linear(out)        
+            final_out = self.linear(out)
             return final_out
 
 
@@ -129,11 +130,11 @@ def ResNet18(num_classes=10, features=False):
 
 
 def ResNet34(num_classes=10, features=False):
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes,features=features)
+    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes=num_classes, features=features)
 
 
 def ResNet50(num_classes=10, features=False):
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes,features=features)
+    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, features=features)
 
 
 def ResNet101(num_classes=10, features=False):
@@ -142,4 +143,3 @@ def ResNet101(num_classes=10, features=False):
 
 def ResNet152(num_classes=10, features=False):
     return ResNet(Bottleneck, [3, 8, 36, 3], num_classes=num_classes, features=features)
-

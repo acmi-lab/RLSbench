@@ -1,6 +1,7 @@
 from transformers import DistilBertForSequenceClassification, DistilBertModel
 import torch.nn as nn
 
+
 class DistilBertClassifier(DistilBertForSequenceClassification):
     def __init__(self, config):
         super().__init__(config)
@@ -14,8 +15,10 @@ class DistilBertClassifier(DistilBertForSequenceClassification):
         )[0]
         return outputs
 
+
 class Identity(nn.Module):
     """An identity layer"""
+
     def __init__(self, d):
         super().__init__()
         self.in_features = d
@@ -23,7 +26,6 @@ class Identity(nn.Module):
 
     def forward(self, x):
         return x
-
 
 
 class DistilBertFeaturizer(DistilBertModel):
@@ -43,15 +45,12 @@ class DistilBertFeaturizer(DistilBertModel):
 
 
 def initialize_bert_based_model(net, num_classes):
+    if net == "distilbert-base-uncased":
+        model = DistilBertClassifier.from_pretrained(net, num_labels=num_classes)
+        d_features = getattr(model, "classifier").in_features
 
-	if net == 'distilbert-base-uncased':
-		model = DistilBertClassifier.from_pretrained(
-			net,
-			num_labels=num_classes)
-		d_features = getattr(model, "classifier").in_features
-  
-		model.classifier = Identity(d_features)
-		model.d_out = d_features
-	else:
-		raise ValueError(f'Model: {net} not recognized.')
-	return model
+        model.classifier = Identity(d_features)
+        model.d_out = d_features
+    else:
+        raise ValueError(f"Model: {net} not recognized.")
+    return model

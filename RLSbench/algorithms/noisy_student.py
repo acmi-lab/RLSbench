@@ -2,14 +2,14 @@ import logging
 
 import torch
 import torch.nn as nn
-from RLSbench.algorithms.single_model_algorithm import \
-    SingleModelAlgorithm
+from RLSbench.algorithms.single_model_algorithm import SingleModelAlgorithm
 from RLSbench.losses import initialize_loss
 from RLSbench.models.initializer import initialize_model
 from RLSbench.models.model_utils import linear_probe
 from RLSbench.utils import concat_input, move_to
 
 logger = logging.getLogger("label_shift")
+
 
 class DropoutModel(nn.Module):
     def __init__(self, featurizer, classifier, dropout_rate):
@@ -60,43 +60,42 @@ class NoisyStudent(SingleModelAlgorithm):
     """
 
     def __init__(self, config, dataloader, loss_function, n_train_steps, **kwargs):
-
         logger.info("Intializing Noisy Student algorithm model")
 
         # initialize student model with dropout before last layer
-        if kwargs['noisystudent_add_dropout']:
+        if kwargs["noisystudent_add_dropout"]:
             featurizer, classifier = initialize_model(
-                model_name = config.model, 
-                dataset_name = config.dataset,
-                num_classes = config.num_classes,
-                featurize = True, 
+                model_name=config.model,
+                dataset_name=config.dataset,
+                num_classes=config.num_classes,
+                featurize=True,
                 pretrained=config.pretrained,
                 pretrained_path=config.pretrained_path,
             )
 
             model = (featurizer, classifier)
 
-            # if config.pretrained : 
+            # if config.pretrained :
             #     featurizer, classifier = linear_probe(model, dataloader, device= config.device, progress_bar=config.progress_bar)
 
             student_model = DropoutModel(
-                featurizer, classifier, kwargs['noisystudent_dropout_rate']
+                featurizer, classifier, kwargs["noisystudent_dropout_rate"]
             )
 
         else:
             featurizer, classifier = initialize_model(
-                model_name = config.model, 
-                dataset_name = config.dataset,
-                num_classes = config.num_classes,
-                featurize = True, 
+                model_name=config.model,
+                dataset_name=config.dataset,
+                num_classes=config.num_classes,
+                featurize=True,
                 pretrained=config.pretrained,
                 pretrained_path=config.pretrained_path,
             )
             model = (featurizer, classifier)
 
-            # if config.pretrained and config.featurize: 
+            # if config.pretrained and config.featurize:
             #     model = linear_probe(model, dataloader, device= config.device)
-    
+
             student_model = nn.Sequential(*model)
 
         # if config.algorithm.startswith("IW"):
@@ -116,11 +115,18 @@ class NoisyStudent(SingleModelAlgorithm):
             loss=loss,
             n_train_steps=n_train_steps,
         )
-        
+
         self.source_balanced = config.source_balanced
         self.num_classes = config.num_classes
 
-    def process_batch(self, batch, unlabeled_batch=None,  target_marginal=None, source_marginal = None, target_average=None):
+    def process_batch(
+        self,
+        batch,
+        unlabeled_batch=None,
+        target_marginal=None,
+        source_marginal=None,
+        target_average=None,
+    ):
         """
         Overrides single_model_algorithm.process_batch().
         Args:
@@ -140,7 +146,7 @@ class NoisyStudent(SingleModelAlgorithm):
         y_true = move_to(y_true, self.device)
 
         # package the results
-        results = { "y_true": y_true}
+        results = {"y_true": y_true}
 
         # Unlabeled examples with pseudolabels
         if unlabeled_batch is not None:
@@ -170,16 +176,13 @@ class NoisyStudent(SingleModelAlgorithm):
 
     def objective(self, results):
         # Labeled loss
-        classification_loss = self.loss(
-            results["y_pred"], results["y_true"]
-        )
+        classification_loss = self.loss(results["y_pred"], results["y_true"])
 
-        # if self.use_target_marginal: 
+        # if self.use_target_marginal:
         #     classification_loss = torch.mean(classification_loss*results["im_weights"][results["y_true"]])
 
-        # elif self.source_balanced: 
+        # elif self.source_balanced:
         #     classification_loss = torch.mean(classification_loss/results["source_marginal"][results["y_true"]]/ self.num_classes)
-
 
         # Pseudolabel loss
         if "unlabeled_y_pseudo" in results:
@@ -187,9 +190,9 @@ class NoisyStudent(SingleModelAlgorithm):
                 results["unlabeled_y_pred"],
                 results["unlabeled_y_pseudo"],
             )
-            # if self.use_target_marginal or self.source_balanced: 
+            # if self.use_target_marginal or self.source_balanced:
             # consistency_loss = torch.mean(consistency_loss)
-        
+
         else:
             consistency_loss = 0
 

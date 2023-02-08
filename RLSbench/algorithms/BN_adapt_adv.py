@@ -15,19 +15,21 @@ _DEFAULT_IMAGE_TENSOR_NORMALIZATION_STD = [0.229, 0.224, 0.225]
 
 class BN_adapt_adv(Algorithm):
     def __init__(self, config):
-
         logger.info("Initializing model...")
 
         model = initialize_model(
-            model_name = config.model, 
-            dataset_name = config.dataset,
-            num_classes = config.num_classes,
-            featurize =False, 
+            model_name=config.model,
+            dataset_name=config.dataset,
+            num_classes=config.num_classes,
+            featurize=False,
             pretrained=False,
         )
-        
-        model = AttackerModel(model, torch.tensor(_DEFAULT_IMAGE_TENSOR_NORMALIZATION_MEAN), torch.tensor(_DEFAULT_IMAGE_TENSOR_NORMALIZATION_STD))
 
+        model = AttackerModel(
+            model,
+            torch.tensor(_DEFAULT_IMAGE_TENSOR_NORMALIZATION_MEAN),
+            torch.tensor(_DEFAULT_IMAGE_TENSOR_NORMALIZATION_STD),
+        )
 
         model.to(config.device)
 
@@ -35,12 +37,12 @@ class BN_adapt_adv(Algorithm):
         super().__init__(
             device=config.device,
         )
-        
+
         self.model = model
 
         self.source_balanced = config.source_balanced
         self.num_classes = config.num_classes
-    
+
     def get_model_output(self, x):
         outputs = self.model(x)
         return outputs
@@ -53,7 +55,7 @@ class BN_adapt_adv(Algorithm):
         Output:
             - results (dictionary): information about the batch
                 - y_true (Tensor): ground truth labels for batch
-                - y_pred (Tensor): model output for batch 
+                - y_pred (Tensor): model output for batch
         """
         x, y_true = batch[:2]
         x = move_to(x, self.device)
@@ -62,8 +64,8 @@ class BN_adapt_adv(Algorithm):
         outputs = self.model(x)
 
         results = {
-            'y_true': y_true,
-            'y_pred': outputs,
+            "y_true": y_true,
+            "y_pred": outputs,
         }
         return results
 
@@ -82,9 +84,17 @@ class BN_adapt_adv(Algorithm):
         results = self.process_batch(batch)
         return results
 
-    def adapt(self, source_loader, target_loader, target_marginal=None, source_marginal=None, target_average=None, pretrained_path=None):
+    def adapt(
+        self,
+        source_loader,
+        target_loader,
+        target_marginal=None,
+        source_marginal=None,
+        target_average=None,
+        pretrained_path=None,
+    ):
         """
-        Load the model and adapt it to the new data 
+        Load the model and adapt it to the new data
         Args:
             - unlabeled_batch (tuple of Tensors): a batch of data yielded by unlabeled data loader
             - target_marginal (Tensor): the marginal distribution of the target
@@ -94,7 +104,7 @@ class BN_adapt_adv(Algorithm):
         Output:
         """
 
-        if pretrained_path is not None:    
+        if pretrained_path is not None:
             logger.info(f"Loading pretrained model from {pretrained_path}")
             load(self.model, pretrained_path, device=self.device)
 
@@ -102,11 +112,10 @@ class BN_adapt_adv(Algorithm):
 
         logger.info("Adapting model to BN params ...")
 
-        with torch.no_grad():    
-            for batch in target_loader: 
+        with torch.no_grad():
+            for batch in target_loader:
                 inp = batch[0].to(self.device)
                 self.model(inp)
-        
-    def reset(self): 
-        pass
 
+    def reset(self):
+        pass

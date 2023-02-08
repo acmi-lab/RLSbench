@@ -9,18 +9,19 @@ from RLSbench.utils import load, move_to
 
 logger = logging.getLogger("label_shift")
 
+
 class CORALModel(nn.Module):
     def __init__(self, featurizer, classifier):
         super().__init__()
         self.featurizer = featurizer
-        self.classifier = classifier 
+        self.classifier = classifier
         # self.mean = None
         self.cov_inv = None
 
     def forward(self, x):
         features = self.featurizer(x)
 
-        if self.cov_inv is not None: 
+        if self.cov_inv is not None:
             # centered = features - self.mean
             features = torch.mm(features, self.cov_inv)
 
@@ -31,7 +32,6 @@ class CORALModel(nn.Module):
 
 class CORAL(Algorithm):
     def __init__(self, config):
-
         logger.info("Initializing model...")
 
         if config.algorithm.startswith("IW"):
@@ -40,27 +40,26 @@ class CORAL(Algorithm):
             self.use_target_marginal = False
 
         model = initialize_model(
-            model_name = config.model, 
-            dataset_name = config.dataset,
-            num_classes = config.num_classes,
-            featurize =True, 
+            model_name=config.model,
+            dataset_name=config.dataset,
+            num_classes=config.num_classes,
+            featurize=True,
             pretrained=False,
         )
-        
-        linear_layer = nn.Linear(model[0].d_out , config.num_classes)
+
+        linear_layer = nn.Linear(model[0].d_out, config.num_classes)
         model = CORALModel(model[0], linear_layer)
-        
+
         # initialize module
         super().__init__(
             device=config.device,
         )
 
         model = model.to(config.device)
-        
+
         self.model = model
         self.source_balanced = config.source_balanced
         self.num_classes = config.num_classes
-
 
     def get_model_output(self, x):
         return self.model(x)
@@ -73,7 +72,7 @@ class CORAL(Algorithm):
         Output:
             - results (dictionary): information about the batch
                 - y_true (Tensor): ground truth labels for batch
-                - y_pred (Tensor): model output for batch 
+                - y_pred (Tensor): model output for batch
         """
         x, y_true = batch[:2]
         x = move_to(x, self.device)
@@ -82,8 +81,8 @@ class CORAL(Algorithm):
         outputs = self.get_model_output(x)
 
         results = {
-            'y_true': y_true,
-            'y_pred': outputs,
+            "y_true": y_true,
+            "y_pred": outputs,
         }
         return results
 
@@ -102,10 +101,17 @@ class CORAL(Algorithm):
         results = self.process_batch(batch)
         return results
 
-
-    def adapt(self, source_loader, target_loader, target_marginal=None, source_marginal=None, target_average=None, pretrained_path = None):
+    def adapt(
+        self,
+        source_loader,
+        target_loader,
+        target_marginal=None,
+        source_marginal=None,
+        target_average=None,
+        pretrained_path=None,
+    ):
         """
-        Load the model and adapt it to the new data 
+        Load the model and adapt it to the new data
         Args:
             - unlabeled_batch (tuple of Tensors): a batch of data yielded by unlabeled data loader
             - target_marginal (Tensor): the marginal distribution of the target
@@ -114,7 +120,7 @@ class CORAL(Algorithm):
 
         Output:
         """
-    
+
         if pretrained_path is not None:
             logger.info(f"Loading pretrained model from {pretrained_path}")
 
@@ -127,18 +133,23 @@ class CORAL(Algorithm):
         im_weights = None
 
         if self.use_target_marginal:
-            im_weights = torch.divide(torch.tensor(target_marginal).to(self.device),\
-                    torch.tensor(source_marginal).to(self.device))
-        
+            im_weights = torch.divide(
+                torch.tensor(target_marginal).to(self.device),
+                torch.tensor(source_marginal).to(self.device),
+            )
 
-        self.model = train_CORAL(self.model, source_loader, im_weights=im_weights, device=self.device)
+        self.model = train_CORAL(
+            self.model, source_loader, im_weights=im_weights, device=self.device
+        )
 
-        # self.model.mean, 
-        self.model.cov_inv = test_CORAL_params(self.model, target_loader, device=self.device)
+        # self.model.mean,
+        self.model.cov_inv = test_CORAL_params(
+            self.model, target_loader, device=self.device
+        )
 
         # self.model.mean = self.model.mean.to(self.device)
         self.model.cov_inv = self.model.cov_inv.to(self.device)
 
-    def reset(self): 
+    def reset(self):
         # self.model.mean = None
         self.model.cov_inv = None

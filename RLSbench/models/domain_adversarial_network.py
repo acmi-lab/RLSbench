@@ -5,6 +5,7 @@ import torch.nn as nn
 from torch.autograd import Function
 import torch.nn.functional as F
 
+
 class DomainDiscriminator(nn.Sequential):
     """
     Adapted from https://github.com/thuml/Transfer-Learning-Library
@@ -55,10 +56,12 @@ class DomainDiscriminator(nn.Sequential):
     def get_parameters_with_lr(self, lr) -> List[Dict]:
         return [{"params": self.parameters(), "lr": lr}]
 
+
 class GradientReverseFunction(Function):
     """
     Credit: https://github.com/thuml/Transfer-Learning-Library
     """
+
     @staticmethod
     def forward(
         ctx: Any, input: torch.Tensor, coeff: Optional[float] = 1.0
@@ -76,6 +79,7 @@ class GradientReverseLayer(nn.Module):
     """
     Credit: https://github.com/thuml/Transfer-Learning-Library
     """
+
     def __init__(self):
         super(GradientReverseLayer, self).__init__()
 
@@ -84,18 +88,22 @@ class GradientReverseLayer(nn.Module):
 
 
 class DomainAdversarialNetwork(nn.Module):
-    def __init__(self, featurizer, classifier, n_domains, num_classes, bottleneck_dim=256):
+    def __init__(
+        self, featurizer, classifier, n_domains, num_classes, bottleneck_dim=256
+    ):
         super().__init__()
         self.featurizer = featurizer
         self.classifier = classifier
         # self.classifier = nn.Linear(bottleneck_dim, num_classes)
         # self.bottleneck = nn.Linear(featurizer.d_out, bottleneck_dim)
         # self.domain_classifier = DomainDiscriminator(featurizer.d_out, n_domains)
-        self.domain_classifier = DomainDiscriminator(featurizer.d_out, n_domains,  batch_norm=False)
-        
+        self.domain_classifier = DomainDiscriminator(
+            featurizer.d_out, n_domains, batch_norm=False
+        )
+
         self.gradient_reverse_layer = GradientReverseLayer()
 
-    def forward(self, input, coeff = 1.0, domain_classifier=False):
+    def forward(self, input, coeff=1.0, domain_classifier=False):
         features = self.featurizer(input)
         # features = self.bottleneck(features)
         y_pred = self.classifier(features)
@@ -103,10 +111,12 @@ class DomainAdversarialNetwork(nn.Module):
             features = self.gradient_reverse_layer(features, coeff)
             domains_pred = self.domain_classifier(features)
             return y_pred, domains_pred
-        else: 
+        else:
             return y_pred
 
-    def get_parameters_with_lr(self, featurizer_lr, classifier_lr, discriminator_lr) -> List[Dict]:
+    def get_parameters_with_lr(
+        self, featurizer_lr, classifier_lr, discriminator_lr
+    ) -> List[Dict]:
         """
         Adapted from https://github.com/thuml/Transfer-Learning-Library
 
@@ -138,22 +148,21 @@ class classifier_deep(nn.Module):
             x = self.gradient_reverse_layer(x, eta)
 
         # x = F.normalize(x)
-        x_out = self.fc2(x) #/ self.temp
+        x_out = self.fc2(x)  # / self.temp
         return x_out
 
-    
+
 class COALNetwork(nn.Module):
     def __init__(self, featurizer, num_classes):
         super().__init__()
         self.featurizer = featurizer
-        self.classifier = classifier_deep(num_classes = num_classes, inc = featurizer.d_out)
+        self.classifier = classifier_deep(num_classes=num_classes, inc=featurizer.d_out)
 
-    def forward(self, input, coeff= 1.0, reverse = False):
+    def forward(self, input, coeff=1.0, reverse=False):
         features = self.featurizer(input)
 
-        y_pred = self.classifier(features, reverse=reverse, eta= coeff)
+        y_pred = self.classifier(features, reverse=reverse, eta=coeff)
         return y_pred
-
 
     def get_parameters_with_lr(self, featurizer_lr, classifier_lr) -> List[Dict]:
         """
@@ -169,18 +178,23 @@ class COALNetwork(nn.Module):
             {"params": self.featurizer.parameters(), "lr": featurizer_lr},
             {"params": self.classifier.parameters(), "lr": classifier_lr},
         ]
-        return params 
+        return params
+
 
 class ConditionalDomainAdversarialNetwork(nn.Module):
-    def __init__(self, featurizer, classifier, n_domains, num_classes, bottleneck_dim=256):
+    def __init__(
+        self, featurizer, classifier, n_domains, num_classes, bottleneck_dim=256
+    ):
         super().__init__()
         self.featurizer = featurizer
         self.classifier = nn.Linear(bottleneck_dim, num_classes)
         self.bottleneck = nn.Linear(featurizer.d_out, bottleneck_dim)
-        self.domain_classifier = DomainDiscriminator(bottleneck_dim*num_classes, n_domains, batch_norm=False)
+        self.domain_classifier = DomainDiscriminator(
+            bottleneck_dim * num_classes, n_domains, batch_norm=False
+        )
         self.gradient_reverse_layer = GradientReverseLayer()
 
-    def forward(self, input, coeff = 1.0, domain_classifier=False):
+    def forward(self, input, coeff=1.0, domain_classifier=False):
         features = self.featurizer(input)
         features = self.bottleneck(features)
 
@@ -196,10 +210,12 @@ class ConditionalDomainAdversarialNetwork(nn.Module):
             # import pdb; pdb.set_trace()
             domains_pred = self.domain_classifier(op_out)
             return y_pred, domains_pred
-        else: 
+        else:
             return y_pred
 
-    def get_parameters_with_lr(self, featurizer_lr, classifier_lr, discriminator_lr) -> List[Dict]:
+    def get_parameters_with_lr(
+        self, featurizer_lr, classifier_lr, discriminator_lr
+    ) -> List[Dict]:
         """
         Adapted from https://github.com/thuml/Transfer-Learning-Library
 
@@ -215,5 +231,3 @@ class ConditionalDomainAdversarialNetwork(nn.Module):
             {"params": self.classifier.parameters(), "lr": classifier_lr},
         ]
         return params + self.domain_classifier.get_parameters_with_lr(discriminator_lr)
-
-

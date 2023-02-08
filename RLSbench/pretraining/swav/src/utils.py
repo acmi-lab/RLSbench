@@ -22,14 +22,15 @@ from .logger import create_logger, PD_Stats
 import torch.distributed as dist
 
 import sys
-sys.path.insert(1, os.path.join(sys.path[0], '../../..'))
-sys.path.insert(1, os.path.join(sys.path[0], '../..'))
+
+sys.path.insert(1, os.path.join(sys.path[0], "../../.."))
+sys.path.insert(1, os.path.join(sys.path[0], "../.."))
 
 from pretraining.swav.src.config import DATASET_DEFAULTS
 from configs.utils import populate_config
 import logging
 
-matplotlib.use('Agg')
+matplotlib.use("Agg")
 
 FALSY_STRINGS = {"off", "false", "0"}
 TRUTHY_STRINGS = {"on", "true", "1"}
@@ -117,9 +118,7 @@ def initialize_exp(params, *args, dump_params=True):
     )
 
     # create a logger
-    logger = create_logger(
-        os.path.join(params.log_dir, "train.log"), rank=params.rank
-    )
+    logger = create_logger(os.path.join(params.log_dir, "train.log"), rank=params.rank)
     logger.info("============ Initialized logger ============")
     logger.info(
         "\n".join("%s: %s" % (k, str(v)) for k, v in sorted(dict(vars(params)).items()))
@@ -148,7 +147,9 @@ def restart_from_checkpoint(ckp_paths, run_variables=None, **kwargs):
 
     # open checkpoint file
     checkpoint = torch.load(
-        ckp_path, map_location="cuda:" + str(torch.distributed.get_rank() % torch.cuda.device_count())
+        ckp_path,
+        map_location="cuda:"
+        + str(torch.distributed.get_rank() % torch.cuda.device_count()),
     )
 
     # key is what to look for in the checkpoint file
@@ -225,14 +226,14 @@ class ParseKwargs(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, dict())
         for value in values:
-            key, value_str = value.split('=')
-            if value_str.replace('-', '').isnumeric():
+            key, value_str = value.split("=")
+            if value_str.replace("-", "").isnumeric():
                 processed_val = int(value_str)
-            elif value_str.replace('-', '').replace('.', '').isnumeric():
+            elif value_str.replace("-", "").replace(".", "").isnumeric():
                 processed_val = float(value_str)
-            elif value_str in ['True', 'true']:
+            elif value_str in ["True", "true"]:
                 processed_val = True
-            elif value_str in ['False', 'false']:
+            elif value_str in ["False", "false"]:
                 processed_val = False
             else:
                 processed_val = value_str
@@ -240,7 +241,7 @@ class ParseKwargs(argparse.Action):
 
 
 def save_plot(df, key_name, plot_name, save_folder):
-    '''
+    """
     Saves a plot of a particular statistic provided by the dataframe.
 
     Parameters
@@ -254,18 +255,18 @@ def save_plot(df, key_name, plot_name, save_folder):
         Name to use for plot title, y-axis, and filename.
     save_folder : Union[str, pathlib.Path]
         Directory to save plots.
-    '''
+    """
     if key_name in df:
         ax = df[key_name].plot()
         ax.set_title(plot_name)
-        ax.set_xlabel('Epoch')
+        ax.set_xlabel("Epoch")
         ax.set_ylabel(plot_name)
-        filename = f'{plot_name}.png'
+        filename = f"{plot_name}.png"
         ax.get_figure().savefig(pathlib.Path(save_folder) / filename)
 
 
 def plot_experiment(log_dir):
-    '''
+    """
     Plots some statistics from the specified experiment and saves the plots.
 
     Parameters
@@ -273,21 +274,21 @@ def plot_experiment(log_dir):
     log_dir : Union[str, pathlib.Path]
         Path containing the results of the experiment. Should have files of the
         form stats*.pkl.
-    '''
+    """
     log_dir = pathlib.Path(log_dir)
     df_list = []
     for filepath in log_dir.iterdir():
         filename = str(filepath.name)
-        if filename.startswith('stats') and filename.endswith('.pkl'):
-            with open(filepath, 'rb') as open_file:
+        if filename.startswith("stats") and filename.endswith(".pkl"):
+            with open(filepath, "rb") as open_file:
                 df_list.append(pickle.load(open_file))
     avg_df = sum(df_list) / len(df_list)
 
     STAT_NAMES = [
-        ('loss', 'Training Loss'),
-        ('prec1', 'Training Accuracy'),
-        ('prec1_val', 'Source Validation Accuracy'),
-        ('prec1_tgt', 'Target Accuracy')
+        ("loss", "Training Loss"),
+        ("prec1", "Training Accuracy"),
+        ("prec1_val", "Source Validation Accuracy"),
+        ("prec1_tgt", "Target Accuracy"),
     ]
     for stat in STAT_NAMES:
         save_plot(avg_df, stat[0], stat[1], log_dir)
@@ -298,11 +299,12 @@ def populate_defaults_for_swav(config):
     """
     Populate defaults for SwAV pretraining.
     """
-    assert config.dataset is not None, 'dataset must be specified'
+    assert config.dataset is not None, "dataset must be specified"
     config = populate_config(config, DATASET_DEFAULTS[config.dataset])
 
     # Sanity checks
-    assert config.warmup_epochs < config.n_epochs, \
-        f'The number of warmup_epochs ({config.warmup_epochs}) cannot be greater than n_epochs ({config.n_epochs}).'
+    assert (
+        config.warmup_epochs < config.n_epochs
+    ), f"The number of warmup_epochs ({config.warmup_epochs}) cannot be greater than n_epochs ({config.n_epochs})."
 
     return config

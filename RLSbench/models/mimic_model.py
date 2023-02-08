@@ -4,9 +4,11 @@ import sys
 import torch
 import torch.nn as nn
 import logging
+
 logger = logging.getLogger("label_shift")
 
 from RLSbench.models.mimic_tokenizer import MIMICTokenizer
+
 
 class Attention(nn.Module):
     def forward(self, query, key, value, mask, dropout=None):
@@ -29,7 +31,9 @@ class MultiHeadedAttention(nn.Module):
         self.d_k = d_model // h
         self.h = h
 
-        self.linear_layers = nn.ModuleList([nn.Linear(d_model, d_model, bias=False) for _ in range(3)])
+        self.linear_layers = nn.ModuleList(
+            [nn.Linear(d_model, d_model, bias=False) for _ in range(3)]
+        )
         self.output_linear = nn.Linear(d_model, d_model, bias=False)
         self.attention = Attention()
 
@@ -45,11 +49,15 @@ class MultiHeadedAttention(nn.Module):
         batch_size = query.size(0)
 
         # 1) Do all the linear projections in batch from d_model => h x d_k
-        query, key, value = [l(x).view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
-                             for l, x in zip(self.linear_layers, (query, key, value))]
+        query, key, value = [
+            l(x).view(batch_size, -1, self.h, self.d_k).transpose(1, 2)
+            for l, x in zip(self.linear_layers, (query, key, value))
+        ]
 
         # 2) Apply attention on all the projected vectors in batch.
-        x, attn = self.attention(query, key, value, mask=mask.unsqueeze(1), dropout=self.dropout)
+        x, attn = self.attention(
+            query, key, value, mask=mask.unsqueeze(1), dropout=self.dropout
+        )
 
         # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(batch_size, -1, self.h * self.d_k)
@@ -84,7 +92,7 @@ class SublayerConnection(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, sublayer):
-        """ Apply residual connection to any sublayer with the same size. """
+        """Apply residual connection to any sublayer with the same size."""
         return x + self.dropout(sublayer(self.norm(x)))
 
 
@@ -102,11 +110,15 @@ class TransformerBlock(nn.Module):
 
         super(TransformerBlock, self).__init__()
         self.attention = MultiHeadedAttention(h=attn_heads, d_model=hidden)
-        self.feed_forward = PositionwiseFeedForward(d_model=hidden, d_ff=4 * hidden, dropout=dropout)
+        self.feed_forward = PositionwiseFeedForward(
+            d_model=hidden, d_ff=4 * hidden, dropout=dropout
+        )
         self.input_sublayer = SublayerConnection(size=hidden, dropout=dropout)
         self.output_sublayer = SublayerConnection(size=hidden, dropout=dropout)
         self.dropout = nn.Dropout(p=dropout)
-        logger.info(f"TransformerBlock added with hid-{hidden}, head-{attn_heads}, in_hid-{2 * hidden}, drop-{dropout}")
+        logger.info(
+            f"TransformerBlock added with hid-{hidden}, head-{attn_heads}, in_hid-{2 * hidden}, drop-{dropout}"
+        )
 
     def forward(self, x, mask):
         """
@@ -121,7 +133,15 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, data_dir, embedding_size: int, dropout: float, layers: int, heads: int, device='cpu'):
+    def __init__(
+        self,
+        data_dir,
+        embedding_size: int,
+        dropout: float,
+        layers: int,
+        heads: int,
+        device="cpu",
+    ):
         super(Transformer, self).__init__()
         self.tokenizer = MIMICTokenizer(data_dir)
         self.embedding_size = embedding_size
@@ -131,21 +151,26 @@ class Transformer(nn.Module):
         self.device = device
 
         # embedding
-        self.code_embedding = nn.Embedding(self.tokenizer.get_code_vocabs_size(), embedding_size, padding_idx=0)
-        self.type_embedding = nn.Embedding(self.tokenizer.get_type_vocabs_size(), embedding_size, padding_idx=0)
+        self.code_embedding = nn.Embedding(
+            self.tokenizer.get_code_vocabs_size(), embedding_size, padding_idx=0
+        )
+        self.type_embedding = nn.Embedding(
+            self.tokenizer.get_type_vocabs_size(), embedding_size, padding_idx=0
+        )
 
         # encoder
-        self.transformer = nn.ModuleList([TransformerBlock(embedding_size, heads, dropout) for _ in range(layers)])
+        self.transformer = nn.ModuleList(
+            [TransformerBlock(embedding_size, heads, dropout) for _ in range(layers)]
+        )
 
         # binary classifier
         self.activation = nn.Sigmoid()
-        
-        self.d_out = embedding_size
 
+        self.d_out = embedding_size
 
     def forward(self, x):
         codes, types = x[0], x[1]
-        codes, types = self.tokenizer(codes, types, padding=True, prefix='<cls>')
+        codes, types = self.tokenizer(codes, types, padding=True, prefix="<cls>")
         codes = codes.cuda()
         types = types.cuda()
 
@@ -156,8 +181,8 @@ class Transformer(nn.Module):
         emb = codes_emb + types_emb
 
         """ transformer """
-        mask = (codes != 0)
-        mask = torch.einsum('ab,ac->abc', mask, mask)
+        mask = codes != 0
+        mask = torch.einsum("ab,ac->abc", mask, mask)
         for transformer in self.transformer:
             x = transformer(emb, mask)  # [# admissions, # batch_codes, embedding_size]
 
@@ -168,7 +193,7 @@ class Transformer(nn.Module):
 
     def get_cls_embed(self, x):
         codes, types = x[0], x[1]
-        codes, types = self.tokenizer(codes, types, padding=True, prefix='<cls>')
+        codes, types = self.tokenizer(codes, types, padding=True, prefix="<cls>")
         codes = codes.cuda()
         types = types.cuda()
 
@@ -179,8 +204,8 @@ class Transformer(nn.Module):
         emb = codes_emb + types_emb
 
         """ transformer """
-        mask = (codes != 0)
-        mask = torch.einsum('ab,ac->abc', mask, mask)
+        mask = codes != 0
+        mask = torch.einsum("ab,ac->abc", mask, mask)
         for transformer in self.transformer:
             x = transformer(emb, mask)  # [# admissions, # batch_codes, embedding_size]
 

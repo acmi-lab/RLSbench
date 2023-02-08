@@ -32,25 +32,27 @@ class CustomSplitDataset(Dataset):
         super().__init__()
 
         self.datasets = []
-        transforms = {'source_train': None, 
-                      'source_test': None,   
-                      'target_train': None,
-                      'target_test': None}
+        transforms = {
+            "source_train": None,
+            "source_test": None,
+            "target_train": None,
+            "target_test": None,
+        }
 
         split = config.splits[0]
         dataset = get_dataset(
             dataset=dataset_name,
             root_dir=root_dir,
-            source=True, 
+            source=True,
             target=True,
-            target_split = split,
+            target_split=split,
             transforms=transforms,
-            num_classes = config.num_classes,
-            seed=config.seed
+            num_classes=config.num_classes,
+            seed=config.seed,
         )
 
-        self.datasets.append(dataset['source_train'])
-        self.datasets.append(dataset['target_train'])
+        self.datasets.append(dataset["source_train"])
+        self.datasets.append(dataset["target_train"])
 
         self.dataset_lengths = [len(d) for d in self.datasets]
 
@@ -67,7 +69,7 @@ class CustomSplitDataset(Dataset):
             ds_idx += 1
         # ds_idx now stores the correct dataset, and index stores
         # the correct position within that dataset
-        x, _ = self.datasets[ds_idx][index] # discard metadata
+        x, _ = self.datasets[ds_idx][index]  # discard metadata
         return x
 
 
@@ -81,7 +83,7 @@ class CustomSplitMultiCropDataset(Dataset):
         min_scale_crops,
         max_scale_crops,
         config,
-        return_index=False
+        return_index=False,
     ):
         super().__init__()
 
@@ -101,13 +103,20 @@ class CustomSplitMultiCropDataset(Dataset):
                 size_crops[i],
                 scale=(min_scale_crops[i], max_scale_crops[i]),
             )
-            trans.extend([transforms.Compose([
-                random_resized_crop,
-                transforms.RandomHorizontalFlip(p=0.5),
-                transforms.Compose(color_transform),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=means, std=stds)])
-            ] * nmb_crops[i])
+            trans.extend(
+                [
+                    transforms.Compose(
+                        [
+                            random_resized_crop,
+                            transforms.RandomHorizontalFlip(p=0.5),
+                            transforms.Compose(color_transform),
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=means, std=stds),
+                        ]
+                    )
+                ]
+                * nmb_crops[i]
+            )
 
         self.trans = trans
 
@@ -129,7 +138,7 @@ class PILRandomGaussianBlur(object):
     This transform was used in SimCLR - https://arxiv.org/abs/2002.05709
     """
 
-    def __init__(self, p=0.5, radius_min=0.1, radius_max=2.):
+    def __init__(self, p=0.5, radius_min=0.1, radius_max=2.0):
         self.prob = p
         self.radius_min = radius_min
         self.radius_max = radius_max
@@ -148,7 +157,7 @@ class PILRandomGaussianBlur(object):
 
 def get_color_distortion(s=1.0):
     # s is the strength of color distortion.
-    color_jitter = transforms.ColorJitter(0.8*s, 0.8*s, 0.8*s, 0.2*s)
+    color_jitter = transforms.ColorJitter(0.8 * s, 0.8 * s, 0.8 * s, 0.2 * s)
     rnd_color_jitter = transforms.RandomApply([color_jitter], p=0.8)
     rnd_gray = transforms.RandomGrayscale(p=0.2)
     color_distort = transforms.Compose([rnd_color_jitter, rnd_gray])
