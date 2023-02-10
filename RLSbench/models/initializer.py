@@ -8,6 +8,38 @@ import torch.nn.functional as F
 import torchvision
 from RLSbench.utils import load
 
+
+from RLSbench.models.cifar_efficientnet import EfficientNetB0 as CIFAREfficientNetB0
+from RLSbench.models.cifar_resnet import (
+    ResNet18 as CIFARResNet18,
+    ResNet34 as CIFARResNet34,
+    ResNet50 as CIFARResNet50,
+    ResNet101 as CIFARResNet101,
+)
+
+from RLSbench.models.clip import (
+    ClipRN50,
+    ClipRN101,
+    ClipViTB16,
+    ClipViTB32,
+    ClipViTL14,
+)
+
+CIFAR_ARCHITECTURES = {
+    "resnet18": CIFARResNet18,
+    "resnet34": CIFARResNet34,
+    "resnet50": CIFARResNet50,
+    "resnet101": CIFARResNet101,
+    "efficientnet_b0": CIFAREfficientNetB0,
+}
+CLIP_ARCHITECTURES = {
+    "cliprn50": ClipRN50,
+    "cliprn101": ClipRN101,
+    "clipvitb16": ClipViTB16,
+    "clipvitb32": ClipViTB32,
+    "clipvitl14": ClipViTL14,
+}
+
 logger = logging.getLogger("label_shift")
 
 
@@ -49,37 +81,18 @@ def initialize_model(
             - model: a model that is equivalent to nn.Sequential(featurizer, classifier)
     """
 
-    if (
-        model_name
-        in ("resnet18", "resnet34", "resnet50", "resnet101", "efficientnetb0")
-        and "cifar" in dataset_name
-    ):
-        from RLSbench.models.cifar_efficientnet import EfficientNetB0
-        from RLSbench.models.cifar_resnet import ResNet18, ResNet34, ResNet50, ResNet101
-
-        arch = {
-            "resnet18": ResNet18,
-            "resnet34": ResNet34,
-            "resnet50": ResNet50,
-            "resnet101": ResNet101,
-            "efficientnet_b0": EfficientNetB0,
-        }
-
-        featurizer = arch[model_name](num_classes=1000, features=True)
-
-        if pretrained:
-            assert (
-                pretrained_path is not None
-            ), "Must provide pretrained_path if pretrained=True"
-            load(featurizer, pretrained_path)
-
-        d_out = getattr(featurizer, "linear").in_features
-        featurizer.d_out = d_out
-        classifier = nn.Linear(d_out, num_classes)
-        model = (featurizer, classifier)
-
-        if not featurize:
-            model = nn.Sequential(*model)
+    if "cifar" in dataset_name:
+        # For the cifar dataset we use specialized versions of the models due to some size differences
+        model = initialize_cifar_model(
+            model_name,
+            dataset_name,
+            num_classes,
+            featurize,
+            in_features,
+            pretrained,
+            pretrained_path,
+            data_dir,
+        )
 
     elif model_name in (
         "resnet18",
@@ -102,30 +115,8 @@ def initialize_model(
         if not featurize:
             model = nn.Sequential(*model)
 
-    elif model_name in (
-        "cliprn50",
-        "cliprn101",
-        "clipvitb16",
-        "clipvitb32",
-        "clipvitl14",
-    ):
-        from RLSbench.models.clip import (
-            ClipRN50,
-            ClipRN101,
-            ClipViTB16,
-            ClipViTB32,
-            ClipViTL14,
-        )
-
-        arch = {
-            "cliprn50": ClipRN50,
-            "cliprn101": ClipRN101,
-            "clipvitb16": ClipViTB16,
-            "clipvitb32": ClipViTB32,
-            "clipvitl14": ClipViTL14,
-        }
-
-        model = arch[model_name](num_classes=num_classes)
+    elif model_name in CLIP_ARCHITECTURES:
+        model = CLIP_ARCHITECTURES[model_name](num_classes=num_classes)
 
         if not featurize:
             model = nn.Sequential(*model)
@@ -176,9 +167,42 @@ def initialize_model(
         model = nn.Linear(in_features=in_features, out_features=num_classes)
 
     else:
+        model = None
+
+    if model == None:
         raise ValueError(f"Model: {model_name} not recognized.")
 
     return model
+
+
+def initialize_cifar_model(
+    model_name,
+    dataset_name,
+    num_classes,
+    featurize=False,
+    in_features=None,
+    pretrained=False,
+    pretrained_path=None,
+    data_dir=None,
+):
+    if model_name not in CIFAR_ARCHITECTURES:
+        raise ValueError(f"CIFAR model {model_name} not recognized.")
+
+    featurizer = CIFAR_ARCHITECTURES[model_name](num_classes=1000, features=True)
+
+    if pretrained:
+        assert (
+            pretrained_path is not None
+        ), "Must provide pretrained_path if pretrained=True"
+        load(featurizer, pretrained_path)
+
+    d_out = getattr(featurizer, "linear").in_features
+    featurizer.d_out = d_out
+    classifier = nn.Linear(d_out, num_classes)
+    model = (featurizer, classifier)
+
+    if not featurize:
+        model = nn.Sequential(*model)
 
 
 def initialize_torchvision_model(name, d_out, pretrained=True):
