@@ -1,3 +1,5 @@
+import itertools
+
 # See algorithms/initializer.py
 algorithms = [
     "ERM",
@@ -53,21 +55,28 @@ additional_transforms = [
     "weak",
 ]
 collate_functions = ["mimic_readmission", "mimic_mortality", "None"]
+
+
 # See models/initializer.py
-models = [
-    "resnet18",
-    "resnet34",
-    "resnet50",
-    "resnet101",
-    "densenet121",
-    "clipvitb32",
-    "clipvitb16",
-    "clipvitl14",
-    "efficientnet_b0",
-    "mimic_model",
-    "distilbert-base-uncased",
-    "MLP",
-]
+# We register all models that are added to any of the following lists of architectures
+from RLSbench.models.initializer import (
+    CIFAR_ARCHITECTURES,
+    CLIP_ARCHITECTURES,
+    TORCHVISION_ARCHITECTURES,
+    OTHER_ARCHITECTURES,
+)
+
+# Preserve order but only keep unique model names
+models = list(
+    dict.fromkeys(
+        itertools.chain(
+            CIFAR_ARCHITECTURES,
+            CLIP_ARCHITECTURES,
+            TORCHVISION_ARCHITECTURES,
+            OTHER_ARCHITECTURES,
+        )
+    )
+)
 
 # Pre-training type
 pretrainining_options = ["clip", "imagenet", "swav", "rand", "bert"]

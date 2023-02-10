@@ -32,6 +32,7 @@ CIFAR_ARCHITECTURES = {
     "resnet101": CIFARResNet101,
     "efficientnet_b0": CIFAREfficientNetB0,
 }
+
 CLIP_ARCHITECTURES = {
     "cliprn50": ClipRN50,
     "cliprn101": ClipRN101,
@@ -39,6 +40,22 @@ CLIP_ARCHITECTURES = {
     "clipvitb32": ClipViTB32,
     "clipvitl14": ClipViTL14,
 }
+
+TORCHVISION_ARCHITECTURES = (
+    "resnet18",
+    "resnet34",
+    "resnet50",
+    "resnet101",
+    "densenet121",
+    "efficientnet_b0",
+)
+
+OTHER_ARCHITECTURES = (
+    "mimic_model",
+    "distilbert-base-uncased",
+    "MLP",
+    "logistic_regression",
+)
 
 logger = logging.getLogger("label_shift")
 
@@ -94,14 +111,7 @@ def initialize_model(
             data_dir,
         )
 
-    elif model_name in (
-        "resnet18",
-        "resnet34",
-        "resnet50",
-        "resnet101",
-        "densenet121",
-        "efficientnet_b0",
-    ):
+    elif model_name in TORCHVISION_ARCHITECTURES:
         featurizer = initialize_torchvision_model(
             name=model_name, d_out=None, pretrained=pretrained
         )
