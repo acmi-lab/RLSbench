@@ -213,6 +213,7 @@ def initialize_cifar_model(
 
     if not featurize:
         model = nn.Sequential(*model)
+    return model
 
 
 def initialize_torchvision_model(name, d_out, pretrained=True):
