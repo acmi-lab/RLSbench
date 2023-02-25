@@ -4,6 +4,8 @@
 
 `RLSbench` is the official implementation of [RLSbench: Domain Adaptation Under Relaxed Label Shift](https://arxiv.org/abs/2302.03020). We release the dataset setup, code and our logs/ models from our paper.
 
+**Update:** We are still working on repository to improve accessiblity and some code structure. Stay tuned!
+
 ### Using the Dataset in an Academic Setting
 
 To try more methods and experiments in our RLSbench setup with limited resources or for fast prototyping, we request people to read this [document](). 
