@@ -79,7 +79,6 @@ for algorithm in ALGORITHMS:
         for seed in SEEDS:
             for alpha in ALPHA:
                 for target_set in TARGET_SETS[dataset]:
-
                     # gpu_id = GPU_IDS[counter % NUM_GPUS]
                     gpu_id = gpu_queue.pop(0)
 

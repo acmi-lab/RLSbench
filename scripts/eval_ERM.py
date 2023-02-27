@@ -70,7 +70,6 @@ for dataset in DATASETS:
         for alpha in ALPHA:
             for target_set in TARGET_SETS[dataset]:
                 for algorithm in ALGORITHMS:
-
                     gpu_id = GPU_IDS[counter % NUM_GPUS]
 
                     source_models = SOURCE_FILE[dataset] % (seed, algorithm)

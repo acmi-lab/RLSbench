@@ -71,7 +71,6 @@ for dataset in DATASETS:
         for alpha in ALPHA:
             for algorithm in ALGORITHMS:
                 for target_set in TARGET_SETS[dataset]:
-
                     gpu_id = GPU_IDS[counter % NUM_GPUS]
 
                     cmd = f"CUDA_VISIBLE_DEVICES={gpu_id} python run_expt.py --remote False \
