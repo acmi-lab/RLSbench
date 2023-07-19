@@ -19,13 +19,13 @@ For more details, refer to the accompanying paper:
 
 If you find this repository useful or use this code in your research, please cite the following paper: 
 
-> Garg, S., Erickson, N., Sharpnack, J., Smola, A., Balakrishnan, S., Lipton, Z. (2023). RLSbench: Domain Adaptation Under Relaxed Label Shift. arxiv preprint  arXiv:2302.03020. 
+> Garg, S., Erickson, N., Sharpnack, J., Smola, A., Balakrishnan, S., Lipton, Z. (2023). RLSbench: Domain Adaptation Under Relaxed Label Shift. In International Conference on Machine Learning (ICML).
 ```
-@article{garg2023RLSBench,
+@inproceedings{garg2023RLSBench,
     title={RLSbench: Domain Adaptation Under Relaxed Label Shift},
     author={Garg, Saurabh and Erickson, Nick and Sharpnack, James and Smola, Alex and Balakrishnan, Sivaraman and Lipton, Zachary},
     year={2023}, 
-    journal={arXiv preprint arXiv:2302.03020}
+    booktitle={International Conference on Machine Learning (ICML)}
 }
 ```
 
