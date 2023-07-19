@@ -7,7 +7,7 @@
 
 ### Using the Dataset in an Academic Setting
 
-To try more methods and experiments in our RLSbench setup with limited resources or for fast prototyping, we recommend restricting experiments to a few datasets with fewer label dist shift simulations. In particular, we observe that experiments on different domains in CIFAR10, Entity13, Living17, Visda and Retiring Adults datasets capture our main findings and the failure models. One can further restrict the simulated shifts to Dirichlet alpha in [None, 1.0 and 0.3] set. 
+To try experiments in our RLSbench setup with limited resources or for fast prototyping, we recommend restricting experiments to a few datasets with fewer label dist shift simulations. In particular, we observe that experiments on different domains in CIFAR10, Entity13, Living17, Visda, and Retiring Adults datasets capture our main findings and the failure models. One can further restrict the simulated shifts to Dirichlet alpha in [None, 1.0 and 0.3] set. 
 
 
 ## Paper
