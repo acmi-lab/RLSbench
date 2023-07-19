@@ -4,11 +4,10 @@
 
 `RLSbench` is the official implementation of [RLSbench: Domain Adaptation Under Relaxed Label Shift](https://arxiv.org/abs/2302.03020). We release the dataset setup, code and our logs/ models from our paper.
 
-**Update:** We are still working on repository to improve accessiblity and some code structure. Stay tuned!
 
 ### Using the Dataset in an Academic Setting
 
-To try more methods and experiments in our RLSbench setup with limited resources or for fast prototyping, we request people to read this [document](). 
+To try more methods and experiments in our RLSbench setup with limited resources or for fast prototyping, we recommend restricting experiments to a few datasets with fewer label dist shift simulations. In particular, we observe that experiments on different domains in CIFAR10, Entity13, Living17, Visda and Retiring Adults datasets capture our main findings and the failure models. One can further restrict the simulated shifts to Dirichlet alpha in [None, 1.0 and 0.3] set. 
 
 
 ## Paper
